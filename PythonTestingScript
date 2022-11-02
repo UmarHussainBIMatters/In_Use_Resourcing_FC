@@ -1,0 +1,127 @@
+import warnings
+warnings.filterwarnings("ignore")
+import numpy as np
+import pandas as pd
+import os
+import tensorflow as tf
+from tqdm import tqdm
+
+data = pd.read_csv(had all data we used for training)
+test_data = pd.read_csv(all data for the test year)
+
+data.isna().sum()
+test_data.isna().sum()  #Checking for any nulls in the data but they were all filtered out at an earlier stage
+
+def teach():
+    features = ['MONTH', 'DoW', 'Grouped_Class','Season','Year', 'Min Temp','Max Temp','Jobs exc PF', 'Rainfall']
+
+    X = df[features]  #this contains all jobs except those fixed over the phone
+
+    y=df.iloc[:,-4].values #this contains the numbers of jobs that we could actually resolve
+
+    y = np.reshape(y, (len(y),1))
+
+    from sklearn.compose import ColumnTransformer
+    from sklearn.preprocessing import OneHotEncoder
+    ct_1 = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [0])], remainder = 'passthrough')
+    X = np.array(ct_1.fit_transform(X))
+    ct_2 = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [-8])], remainder = 'passthrough')
+    X = np.array(ct_2.fit_transform(X))
+    ct_3 = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [-7])], remainder = 'passthrough')
+    X = np.array(ct_3.fit_transform(X))
+    ct_4 = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [-6])], remainder = 'passthrough')
+    X = np.array(ct_4.fit_transform(X))
+
+    from sklearn.preprocessing import StandardScaler
+    sc_X = StandardScaler()
+    sc_y = StandardScaler()
+
+    from sklearn.model_selection import train_test_split
+    X_train, X_test, y_train, y_test = train_test_split(X,y,train_size=0.8, random_state=0) #tested the data on a small scale with high level results to begin with.
+
+    from sklearn.preprocessing import StandardScaler
+    X_train = sc_X.fit_transform(X_train)
+    X_test = sc_X.transform(X_test)
+    y_train = sc_y.fit_transform(y_train)
+    y_test = sc_y.transform(y_test)
+
+    from sklearn.metrics import r2_score, mean_absolute_percentage_error
+    ann = tf.keras.models.Sequential()
+    ann.add(tf.keras.layers.Dense(units = 66, activation = 'relu'))
+    ann.add(tf.keras.layers.Dense(units = 66, activation = 'relu'))
+    ann.add(tf.keras.layers.Dense(units = 66, activation = 'relu'))
+    ann.add(tf.keras.layers.Dense(units = 66, activation = 'relu'))
+    ann.add(tf.keras.layers.Dense(units = 66, activation = 'relu'))
+    ann.add(tf.keras.layers.Dense(units = 66, activation = 'relu'))
+    ann.add(tf.keras.layers.Dense(units=1, activation = 'linear'))
+    ann.compile(optimizer = 'adam' , loss = 'mean_squared_error')
+    ann.fit(X_train, y_train, batch_size=8, epochs = 300)
+    y_ANN_pred = ann.predict(X_test)
+    r2 = r2_score(y_test,y_ANN_pred)
+    MAPE = mean_absolute_percentage_error(y_test,y_ANN_pred)
+    adj_r2 = 1 - (((1-r2)*(len(X_train[:,0]-1)))/(len(X_train[:,0]) - len(X_train[0,:]) -1))
+
+    print(f"ANN R2: {r2}") # ANN
+    print(f"ANN MAPE: {MAPE}")
+    print(f"ANN adj_R2: {adj_r2}")
+
+    from xgboost import XGBRegressor
+    reg_XGB = XGBRegressor()
+    reg_XGB.fit(X_train, y_train)
+    y_XGB_pred = reg_XGB.predict(X_test)
+    r2 = r2_score(y_test,y_XGB_pred)
+    MAPE = mean_absolute_percentage_error(y_test,y_XGB_pred)
+    adj_r2 = 1 - (((1-r2)*(len(X_train[:,0]-1)))/(len(X_train[:,0]) - len(X_train[0,:]) -1))
+
+    print(f"XGB R2: {r2}") # xgb
+    print(f"XGB MAPE: {MAPE}")
+    print(f"XGB adj_R2: {adj_r2}")
+
+
+    from sklearn.linear_model import LinearRegression
+    reg_Lin = LinearRegression()
+    reg_Lin.fit(X_train, y_train)
+    y_Lin_pred = reg_Lin.predict(X_test)
+    r2 = r2_score(y_test,y_Lin_pred)
+    MAPE = mean_absolute_percentage_error(y_test,y_Lin_pred)
+    adj_r2 = 1 - (((1-r2)*(len(X_train[:,0]-1)))/(len(X_train[:,0]) - len(X_train[0,:]) -1))
+
+    print(f"LNR R2: {r2}") # Linear Regression
+    print(f"LNR MAPE: {MAPE}")
+    print(f"LNR adj_R2: {adj_r2}")
+
+    X_1 = df_test[features]
+
+
+    X_1 = np.array(ct_1.transform(X_1))
+    X_1 = np.array(ct_2.transform(X_1))
+    X_1 = np.array(ct_3.transform(X_1))
+    X_1 = np.array(ct_4.transform(X_1))
+
+    X_1 = sc_X.transform(X_1)
+
+    y_1_xgb_pred = reg_XGB.predict(X_1)
+    y_1_Lin_pred = reg_Lin.predict(X_1)
+    y_1_ANN_pred = ann.predict(X_1)
+    y_1_xgb_pred = np.reshape(y_1_xgb_pred, (len(y_1_xgb_pred),1))
+    y_1_xgb_pred = sc_y.inverse_transform(y_1_xgb_pred)
+    y_1_Lin_pred = np.reshape(y_1_Lin_pred, (len(y_1_Lin_pred),1))
+    y_1_Lin_pred = sc_y.inverse_transform(y_1_Lin_pred)
+    y_1_ANN_pred = np.reshape(y_1_ANN_pred, (len(y_1_ANN_pred),1))
+    y_1_ANN_pred = sc_y.inverse_transform(y_1_ANN_pred)
+
+    df_test["y_1_ANN_pred"] = y_1_ANN_pred
+    df_test["y_1_Lin_pred"] = y_1_Lin_pred
+    df_test["y_1_xgb_pred"] = y_1_xgb_pred
+
+
+    path = os.path.isfile(file path)
+    if path == True:
+        df_test.to_csv(path, mode="a", index=False, header=False)
+    else:
+        df_test.to_csv(path, index=False)
+
+for i in tqdm(range(1,data["ClusterID"].max()+1)):
+    df = data.apply(lambda row: row[data["ClusterID"].isin ([i])])
+    df_test = test_data.apply(lambda row: row[test_data["ClusterID"].isin ([i])])
+    teach()
